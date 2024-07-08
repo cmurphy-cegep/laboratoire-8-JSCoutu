@@ -9,6 +9,9 @@ const upload = multer({ storage: storage });
 const HttpError = require("../HttpError");
 
 const productQueries = require("../queries/ProductQueries");
+const passport = require("passport");
+
+
 
 // GET de la liste des produits
 // (Ne requiert pas d'authentification)
@@ -74,10 +77,17 @@ router.get('/:id/image', (req, res, next) => {
 // un client normal (et aucun ajout de produit ne doit avoir lieu dans ce cas).
 // On peut utiliser la propriété req.user pour obtenir les informations du compte authentifié.
 //
-// Au besoin, référez-vous au module listeDifussionRouter.js dans l'exemple de code du cours 19.
+// Au besoin, référez-vous au module contactRouter.js dans l'exemple de code du cours 19.
 router.post('/',
+    passport.authenticate('basic', { session: false }),
     (req, res, next) => {
+        const user = req.user;
+        if (!user || !user.isAdmin) {
+            return next({ status: 403, message: "Droit administrateur requis" });
+        }
+
         const id = req.body.id;
+
         if (!id || id === '') {
             // Le return fait en sorte qu'on n'exécutera pas le reste de la fonction
             // après l'appel à next(...).
@@ -86,7 +96,7 @@ router.post('/',
 
         productQueries.getProductById(id).then(product => {
             if (product) {
-                throw new HttpError(400, `Un produit avec l'id ${id} existe déjà`);
+                return next(new HttpError(400, `Un produit avec l'id ${id} existe déjà`));
             }
 
             const newProduct = {
@@ -98,13 +108,12 @@ router.post('/',
                 longDesc: "" + req.body.longDesc
             };
 
-            return productQueries.insertProduct(newProduct);
-        }).then(result => {
-            res.json(result);
-        }).catch(err => {
-            next(err);
+            return productQueries.insertProduct(newProduct).then(result => {
+                res.json(result);
+            }).catch(err => {
+                return next(err);
+            });
         });
-
     });
 
 // PUT pour la modification d'un produit
@@ -112,7 +121,13 @@ router.post('/',
 // Approche similaire que pour le POST ci-haut. La modification d'un produit
 // doit être refusée pour les comptes non-administrateurs (avec un statut HTTP 403).
 router.put('/:id',
+    passport.authenticate('basic', { session: false }),
     (req, res, next) => {
+        const user = req.user;
+        if (!user || !user.isAdmin) {
+            return next({ status: 403, message: "Droit administrateur requis" });
+        }
+
         const id = req.params.id;
         if (!id || id === '') {
             return next(new HttpError(400, 'Le paramètre id est requis'));
@@ -140,7 +155,6 @@ router.put('/:id',
         }).catch(err => {
             return next(err);
         });
-
     });
 
 
@@ -149,7 +163,13 @@ router.put('/:id',
 // Approche similaire que pour le POST ci-haut. Le retrait d'un produit
 // doit être refusée pour les comptes non-administrateurs (avec un statut HTTP 403).
 router.delete('/:id',
+    passport.authenticate('basic', { session: false }),
     (req, res, next) => {
+        const user = req.user;
+        if (!user || !user.isAdmin) {
+            return next({ status: 403, message: "Droit administrateur requis" });
+        }
+
         const id = req.params.id;
         if (!id || id === '') {
             return next(new HttpError(400, 'Le paramètre id est requis'));
@@ -174,7 +194,12 @@ router.post('/:id/image',
     // Fonction middleware de multer pour gérer l'upload d'un fichier dans ce endpoint.
     // Cet appel de middleware doit venir après celui de l'authentification.
     upload.single('product-image'), // doit correspondre à l'id du champ dans le formulaire html
+    passport.authenticate('basic', { session: false }),
     (req, res, next) => {
+        const user = req.user;
+        if (!user || !user.isAdmin) {
+            return next({ status: 403, message: "Droit administrateur requis" });
+        }
         const id = req.params.id;
         if (!id || id === '') {
             // Le return fait en sorte qu'on n'exécutera pas le reste de la fonction
