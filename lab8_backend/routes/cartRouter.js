@@ -6,12 +6,14 @@ const HttpError = require("../HttpError");
 const productQueries = require("../queries/ProductQueries");
 const cartQueries = require("../queries/CartQueries");
 
+const passport = require('passport');
+
 // ** Exercice 1.4 **
 // Activer l'authentification pour toutes les routes (chemins d'URL) servis par cet 
 // objet routeur. On peut faire cela au niveau de l'objet router, car aucune route
 // gérée par celui-ci ne doit être accessible publiquement.
-// Référez-vous au besoin au module contactRouter.js dans les exemples du cours 19.
-
+// Référez-vous au besoin au module listeDiffusionRouter.js dans les exemples du cours 19.
+router.use(passport.authenticate('basic', { session: false }));
 
 router.get('/:userId', (req, res, next) => {
     try {
@@ -34,7 +36,11 @@ router.get('/:userId', (req, res, next) => {
         // Conseil: il peut s'avérer judicieux d'extraire la logique de validation pour l'autorisation
         // d'accès au panier dans une fonction à part, car la même logique s'appliquera pour les routes
         // PUT et DELETE liées au panier.
+        const user = req.user;
 
+        if ((user.userAccountId !== req.params.userId) &&  !user.isAdmin) {
+            return next({ status: 403, message: "Droit d'acces à ce panier requis" });
+        }
 
         cartQueries.getCurrentCartByUserId(req.params.userId).then(cart => {
             res.json(cart);
@@ -60,6 +66,12 @@ router.put('/:userId/:productId', (req, res, next) => {
 
         if (!req.params.productId || req.params.productId === '') {
             throw new HttpError(400, "Le paramètre productId doit être spécifié");
+        }
+        const user = req.user;
+
+        
+        if ((user.userAccountId !== req.params.userId) &&  !user.isAdmin) {
+            return next({ status: 403, message: "Droit d'acces à ce panier requis" });
         }
 
         const userId = "" + req.params.userId;
@@ -96,6 +108,11 @@ router.delete('/:userId/:productId', (req, res, next) => {
         if (!req.params.productId || req.params.productId === '') {
             throw new HttpError(400, "Le paramètre productId doit être spécifié");
         }
+        const user = req.user;
+
+        if ((user.userAccountId !== req.params.userId) &&  !user.isAdmin) {
+            return next({ status: 403, message: "Droit d'acces à ce panier requis" });
+        }
 
         const userId = "" + req.params.userId;
         const productId = "" + req.params.productId;
@@ -122,6 +139,14 @@ router.delete('/:userId', (req, res, next) => {
         // La même logique d'autorisation que pour le GET d'un panier s'applique ici :
         // - Un utilisateur non-administrateur ne peut supprimer que son propre panier
         // - Un utilisateur administrateur peut supprimer n'importe quel panier
+        const user = req.user;
+
+        if (!user || !user.isAdmin) {
+            return next({ status: 403, message: "Droit administrateur requis" });
+        }
+        if (req.user.userAccountId != req.params.userId) {
+            return next({ status: 403, message: "Vous n'avez pas acces au panier des autres utilisateurs" });
+        }
 
         const userId = "" + req.params.userId;
 

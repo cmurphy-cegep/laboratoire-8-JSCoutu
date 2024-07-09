@@ -5,6 +5,8 @@ const HttpError = require("../HttpError");
 
 const orderQueries = require("../queries/OrderQueries");
 
+const passport = require('passport');
+
 // ** Exercice 1.5 **
 // Active l'authentification pour toutes les routes (chemins d'URL) servis par cet 
 // objet routeur
@@ -14,7 +16,16 @@ const orderQueries = require("../queries/OrderQueries");
 // Sécurisez adéquatement cette ressource afin que seuls les comptes administrateur puissent
 // y avoir accès. Toute autre tentative de la part d'un compte client normal doit être
 // refusée avec un statut HTTP 403 Forbidden.
+
+router.use(passport.authenticate('basic', { session: false }));
+
+
+
 router.get('/', (req, res, next) => {
+    const user = req.user;
+    if (!user || !user.isAdmin) {
+        return next({ status: 403, message: "Droit administrateur requis" });
+    }
     orderQueries.getAllOrders().then(orders => {
         res.json(orders);
     }).catch(err => {
@@ -32,6 +43,11 @@ router.post('/', (req, res, next) => {
     // authentifié. Si ces deux valeurs ne correspondent pas, c'est que quelqu'un tente de passer
     // une commande avec le panier d'un autre client : on doit donc bloquer cette tentative en
     // retournant un statut HTTP 403 Forbidden !
+    
+
+    if (req.body.userId !== req.user.userAccountId) {
+        return next({ status: 403, message: "Vous n'avez pas acces au panier des autres utilisateurs" });
+    }
 
     orderQueries.placeOrder(req.body).then(order => {
         res.json(order);
